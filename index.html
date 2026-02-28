@@ -2,21 +2,102 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>تحويل Dailymotion</title>
+    <title>تحويل Dailymotion مباشر</title>
     <script>
-        // استخراج معرف الفيديو من مسار 404
-        const path = window.location.pathname;
-        const videoId = path.split('/').pop();
-        
-        if (videoId && videoId.length > 5) {
-            // تحويل مباشر
-            window.location.href = `/dyget/?id=${videoId}`;
-        } else {
-            window.location.href = '/dyget/';
+        // استخراج معرف الفيديو من الرابط
+        function getVideoId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let videoId = urlParams.get('id') || urlParams.get('video');
+            
+            // إذا كان المعرف في مسار URL (مثل /x98ox48)
+            if (!videoId) {
+                const path = window.location.pathname;
+                const match = path.match(/\/([a-zA-Z0-9]+)$/);
+                if (match) videoId = match[1];
+            }
+            
+            return videoId;
         }
+
+        // التحويل المباشر
+        async function redirectToM3U8() {
+            const videoId = getVideoId();
+            
+            // إذا لا يوجد معرف فيديو، عرض رسالة بسيطة
+            if (!videoId) {
+                document.body.innerHTML = `
+                    <div style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2>🎬 Dailymotion Direct Redirector</h2>
+                        <p>استخدم الرابط بهذا الشكل:</p>
+                        <code style="background: #f0f0f0; padding: 10px; display: block; margin: 20px;">
+                            https://idesignix.github.io/dyget/?id=x98ox48
+                        </code>
+                        <p>أو</p>
+                        <code style="background: #f0f0f0; padding: 10px; display: block; margin: 20px;">
+                            https://idesignix.github.io/dyget/x98ox48
+                        </code>
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                // محاولة جلب الرابط من عدة APIs
+                const proxies = [
+                    `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://geo.dailymotion.com/video/${videoId}.json?legacy=true&embedder=https://www.dailymotion.com/video/${videoId}`)}`,
+                    `https://corsproxy.io/?${encodeURIComponent(`https://geo.dailymotion.com/video/${videoId}.json?legacy=true&embedder=https://www.dailymotion.com/video/${videoId}`)}`,
+                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://geo.dailymotion.com/video/${videoId}.json?legacy=true&embedder=https://www.dailymotion.com/video/${videoId}`)}`
+                ];
+
+                let m3u8Url = null;
+                
+                // تجربة كل proxy
+                for (const proxy of proxies) {
+                    try {
+                        const response = await fetch(proxy);
+                        const data = await response.json();
+                        
+                        // استخراج الرابط
+                        if (data.qualities?.auto?.[0]?.url) {
+                            m3u8Url = data.qualities.auto[0].url.replace(/\\\//g, '/');
+                            break;
+                        } else if (data.streams?.auto?.[0]?.url) {
+                            m3u8Url = data.streams.auto[0].url.replace(/\\\//g, '/');
+                            break;
+                        }
+                    } catch (e) {
+                        console.log('Proxy failed:', e);
+                    }
+                }
+
+                // إذا وجدنا الرابط، نحول مباشرة
+                if (m3u8Url) {
+                    window.location.replace(m3u8Url);
+                } else {
+                    throw new Error('لم نتمكن من العثور على رابط الفيديو');
+                }
+
+            } catch (error) {
+                // في حالة الخطأ، عرض رسالة بسيطة
+                document.body.innerHTML = `
+                    <div style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2>❌ خطأ</h2>
+                        <p>${error.message}</p>
+                        <p>تأكد من صحة معرف الفيديو: <strong>${videoId}</strong></p>
+                        <button onclick="location.reload()">إعادة المحاولة</button>
+                    </div>
+                `;
+            }
+        }
+
+        // تشغيل التحويل مباشرة عند تحميل الصفحة
+        window.onload = redirectToM3U8;
     </script>
 </head>
-<body>
-    <p>جاري التحويل...</p>
+<body style="margin:0; padding:20px; font-family:Arial; text-align:center;">
+    <div style="margin-top:50px;">
+        <h2>⏳ جاري التحويل إلى رابط m3u8...</h2>
+        <p>سيتم تحويلك تلقائياً خلال لحظات</p>
+    </div>
 </body>
 </html>
